@@ -79,10 +79,19 @@ def main():
         if "session_id" not in st.session_state:
             st.session_state.session_id = None
         
-        if st.button("🔄 New Session"):
-            st.session_state.session_id = None
-            st.session_state.messages = []
-            st.rerun()
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            if st.button("🔄 New Session"):
+                st.session_state.session_id = None
+                st.session_state.messages = []
+                clear_cached_video_urls()
+                st.rerun()
+        
+        with col2:
+            if st.button("🧹 Clear Cache"):
+                clear_cached_video_urls()
+                st.rerun()
         
         if st.session_state.session_id:
             st.info(f"Session ID: {st.session_state.session_id[:8]}...")
@@ -136,24 +145,60 @@ def main():
                     video_response = generate_video_with_progress(message_text, agent_type)
                     
                     if video_response and video_response.get("video_url"):
-                        st.success("✅ Video generated successfully!")
                         video_url = video_response["video_url"]
-                        st.info(f"Video URL: {video_url}")
                         
-                        # Clear any old video URLs from session state to prevent caching issues
-                        for msg in st.session_state.messages:
-                            if "video_url" in msg:
-                                del msg["video_url"]
-                        
-                        # Enhanced video display with multiple fallback methods
-                        robust_video_display(video_url)
-                        
-                        # Add video URL to last assistant message with cache-busting
-                        st.session_state.messages.append({
-                            "role": "assistant", 
-                            "content": response.get("message", ""),
-                            "video_url": video_response["video_url"]
-                        })
+                        # Validate that we got a combined video URL, not an individual chunk
+                        if "ultra_combined_" in video_url:
+                            st.success("✅ Video generated successfully!")
+                            st.info(f"Video URL: {video_url}")
+                            
+                            # Clear any old video URLs from session state to prevent caching issues
+                            for msg in st.session_state.messages:
+                                if "video_url" in msg:
+                                    del msg["video_url"]
+                            
+                            # Enhanced video display with multiple fallback methods
+                            robust_video_display(video_url)
+                            
+                            # Add video URL to last assistant message with cache-busting
+                            st.session_state.messages.append({
+                                "role": "assistant", 
+                                "content": response.get("message", ""),
+                                "video_url": video_response["video_url"]
+                            })
+                        elif "ultra_wav2lip_" in video_url:
+                            st.warning("⚠️ Received individual chunk URL instead of combined video")
+                            st.info("🔄 This might be a cached URL from a previous request")
+                            st.info("💡 Try refreshing the page or starting a new session")
+                            
+                            # Don't add this URL to session state to prevent caching issues
+                            st.session_state.messages.append({
+                                "role": "assistant", 
+                                "content": response.get("message", "")
+                            })
+                            
+                            # Show manual recovery options
+                            st.error("❌ Video display failed due to URL caching issue")
+                            st.info("📥 Manual recovery options:")
+                            st.markdown("""
+                            1. **Refresh the page** and try again
+                            2. **Start a new session** using the sidebar
+                            3. **Clear browser cache** and reload
+                            4. **Try a different browser**
+                            """)
+                        else:
+                            st.warning("⚠️ Unknown video URL pattern")
+                            st.info(f"Video URL: {video_url}")
+                            
+                            # Enhanced video display with multiple fallback methods
+                            robust_video_display(video_url)
+                            
+                            # Add video URL to last assistant message
+                            st.session_state.messages.append({
+                                "role": "assistant", 
+                                "content": response.get("message", ""),
+                                "video_url": video_response["video_url"]
+                            })
                     else:
                         st.error("❌ Video generation failed")
                         # Add message without video URL
@@ -412,9 +457,42 @@ def check_backend_health() -> bool:
     except:
         return False
 
+def validate_video_url(video_url: str) -> bool:
+    """Validate if a video URL is accessible and valid"""
+    try:
+        response = requests.head(video_url, timeout=10)
+        if response.status_code == 200:
+            content_type = response.headers.get('content-type', '')
+            content_length = response.headers.get('content-length', '0')
+            
+            # Check if it's a video file
+            if 'video' in content_type or video_url.endswith('.mp4'):
+                # Check if file has reasonable size (at least 1KB)
+                if int(content_length) > 1024:
+                    return True
+                else:
+                    print(f"⚠️ Video file too small: {content_length} bytes")
+                    return False
+            else:
+                print(f"⚠️ Not a video file: {content_type}")
+                return False
+        else:
+            print(f"⚠️ Video URL not accessible: {response.status_code}")
+            return False
+    except Exception as e:
+        print(f"❌ Error validating video URL: {str(e)}")
+        return False
+
 def robust_video_display(video_url: str):
     """Display video robustly with multiple fallback methods and better error handling."""
     video_displayed = False
+    
+    # Pre-validate the video URL
+    if not validate_video_url(video_url):
+        st.error(f"❌ Invalid video URL: {video_url}")
+        st.info("💡 This might be a cached URL from a previous request")
+        st.info("🔄 Try refreshing the page or starting a new session")
+        return
     
     # Method 1: Direct st.video() with error handling
     try:
@@ -538,6 +616,14 @@ def robust_video_display(video_url: str):
                 st.info(f"📊 Video info: {response.headers.get('content-length', 'Unknown')} bytes, {response.headers.get('content-type', 'Unknown type')}")
         except:
             pass
+
+def clear_cached_video_urls():
+    """Clear all cached video URLs from session state to prevent caching issues"""
+    if "messages" in st.session_state:
+        for msg in st.session_state.messages:
+            if "video_url" in msg:
+                del msg["video_url"]
+        st.success("🧹 Cleared cached video URLs")
 
 if __name__ == "__main__":
     main() 
