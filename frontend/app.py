@@ -147,8 +147,8 @@ def main():
                     if video_response and video_response.get("video_url"):
                         video_url = video_response["video_url"]
                         
-                        # Validate that we got a combined video URL, not an individual chunk
-                        if "ultra_combined_" in video_url:
+                        # Accept both combined videos (ultra_combined_*) and single videos (ultra_wav2lip_*) as valid
+                        if "ultra_combined_" in video_url or "ultra_wav2lip_" in video_url:
                             st.success("✅ Video generated successfully!")
                             st.info(f"Video URL: {video_url}")
                             
@@ -166,26 +166,6 @@ def main():
                                 "content": response.get("message", ""),
                                 "video_url": video_response["video_url"]
                             })
-                        elif "ultra_wav2lip_" in video_url:
-                            st.warning("⚠️ Received individual chunk URL instead of combined video")
-                            st.info("🔄 This might be a cached URL from a previous request")
-                            st.info("💡 Try refreshing the page or starting a new session")
-                            
-                            # Don't add this URL to session state to prevent caching issues
-                            st.session_state.messages.append({
-                                "role": "assistant", 
-                                "content": response.get("message", "")
-                            })
-                            
-                            # Show manual recovery options
-                            st.error("❌ Video display failed due to URL caching issue")
-                            st.info("📥 Manual recovery options:")
-                            st.markdown("""
-                            1. **Refresh the page** and try again
-                            2. **Start a new session** using the sidebar
-                            3. **Clear browser cache** and reload
-                            4. **Try a different browser**
-                            """)
                         else:
                             st.warning("⚠️ Unknown video URL pattern")
                             st.info(f"Video URL: {video_url}")
@@ -486,6 +466,7 @@ def validate_video_url(video_url: str) -> bool:
 def robust_video_display(video_url: str):
     """Display video robustly with multiple fallback methods and better error handling."""
     video_displayed = False
+    errors = []
     
     # Pre-validate the video URL
     if not validate_video_url(video_url):
@@ -498,9 +479,9 @@ def robust_video_display(video_url: str):
     try:
         st.video(video_url)
         video_displayed = True
-        st.success("✅ Video displayed successfully!")
+        # Don't show success message here to avoid clutter - video is already visible
     except Exception as e:
-        st.warning(f"⚠️ Direct video display failed: {str(e)}")
+        errors.append(f"Direct video display: {str(e)}")
     
     # Method 2: Test URL accessibility and try again with different approach
     if not video_displayed:
@@ -522,11 +503,11 @@ def robust_video_display(video_url: str):
                     video_displayed = True
                     st.success("✅ Video displayed with HTML player!")
                 except Exception as e2:
-                    st.warning(f"⚠️ HTML video player failed: {str(e2)}")
+                    errors.append(f"HTML video player: {str(e2)}")
             else:
-                st.error(f"❌ Video URL not accessible: {test_response.status_code}")
+                errors.append(f"Video URL not accessible: {test_response.status_code}")
         except Exception as e:
-            st.error(f"❌ Error testing video URL: {str(e)}")
+            errors.append(f"Error testing video URL: {str(e)}")
     
     # Method 3: Alternative HTML video player with different configuration
     if not video_displayed:
@@ -550,7 +531,7 @@ def robust_video_display(video_url: str):
             video_displayed = True
             st.success("✅ Video displayed with alternative HTML player!")
         except Exception as e:
-            st.error(f"❌ Alternative HTML video player failed: {str(e)}")
+            errors.append(f"Alternative HTML video player: {str(e)}")
     
     # Method 4: Iframe embed as fallback
     if not video_displayed:
@@ -575,9 +556,9 @@ def robust_video_display(video_url: str):
             video_displayed = True
             st.success("✅ Video displayed with iframe embed!")
         except Exception as e:
-            st.error(f"❌ Iframe embed failed: {str(e)}")
+            errors.append(f"Iframe embed: {str(e)}")
     
-    # Method 5: Download link and manual instructions as last resort
+    # Only show errors if ALL methods failed
     if not video_displayed:
         st.error("❌ All video display methods failed")
         st.info("📥 Alternative viewing options:")
@@ -616,6 +597,15 @@ def robust_video_display(video_url: str):
                 st.info(f"📊 Video info: {response.headers.get('content-length', 'Unknown')} bytes, {response.headers.get('content-type', 'Unknown type')}")
         except:
             pass
+        
+        # Show detailed errors for debugging
+        if errors:
+            st.error("🔍 Detailed errors for debugging:")
+            for error in errors:
+                st.text(f"• {error}")
+    else:
+        # Video was displayed successfully - show a subtle success indicator
+        st.success("✅ Video ready for playback")
 
 def clear_cached_video_urls():
     """Clear all cached video URLs from session state to prevent caching issues"""

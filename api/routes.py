@@ -411,7 +411,6 @@ async def serve_video(filename: str):
         return FileResponse(
             path=video_path,
             media_type="video/mp4",
-            filename=filename,
             headers=headers
         )
         
