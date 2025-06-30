@@ -144,29 +144,14 @@ class UltraFastProcessor:
         
         print(f"🎬 Starting ultra-fast video generation for audio: {audio_url}")
         
-        # Temporarily disable caching to ensure fresh content
-        # cache_key = self._get_video_cache_key(audio_url, agent_type)
-        # cached_video = await self._check_video_cache(cache_key)
-        # if cached_video:
-        #     print(f"🚀 Using ultra-cached video: {cached_video}")
-        #     return cached_video
-        
         # Get audio duration
         audio_duration = await self._get_audio_duration_fast(audio_url)
         print(f"🎵 Audio duration: {audio_duration:.2f}s")
         
-        # ROBUST processing strategy to prevent looping issues
-        if audio_duration <= 12:  # Extended range for single video generation (was 15)
-            print(f"🎬 Using single video generation for optimal audio ({audio_duration:.2f}s)")
-            print(f"🎬 This prevents any potential looping issues from chunking")
-            video_url = await self._generate_single_video_ultra_fast(audio_url, agent_type)
-        else:
-            print(f"🎬 Using parallel video generation for very long audio ({audio_duration:.2f}s)")
-            print(f"🎬 Only using chunking for content longer than 12 seconds")
-            video_url = await self._generate_parallel_video_ultra_fast(audio_url, agent_type)
-        
-        # Cache the result
-        # await self._cache_video(cache_key, video_url)
+        # IMMEDIATE FIX: Force single video generation for ALL content to eliminate chunking issues
+        print(f"🎬 FORCING SINGLE VIDEO GENERATION for all content (eliminating chunking issues)")
+        print(f"🎬 This prevents any potential looping issues from chunking")
+        video_url = await self._generate_single_video_ultra_fast(audio_url, agent_type)
         
         return video_url
     
@@ -255,232 +240,123 @@ class UltraFastProcessor:
             return await self._generate_single_video_ultra_fast(audio_url, agent_type)
     
     async def _split_audio_ultra_fast(self, audio_path: str) -> List[str]:
-        """Split audio into ultra-small chunks for maximum speed with improved synchronization"""
-        
-        # Get duration
-        duration = await self._get_audio_duration_fast(audio_path)
-        
-        print(f"🎵 Audio duration: {duration:.2f}s")
-        
-        # For very short audio (6 seconds or less), process as single chunk
-        if duration <= 6:
-            print(f"✅ Processing short audio as single chunk")
-            return [audio_path]
-        
-        # IMPROVED CHUNKING LOGIC to eliminate duration gaps and prevent chunk 1 repeating
-        # Use adaptive chunk sizing based on duration to avoid problematic remainders
-        
-        if duration <= 12:
-            # For 6-12 seconds, use single chunk to avoid issues
-            print(f"✅ Processing medium audio as single chunk (6-12s range)")
-            return [audio_path]
-        elif duration <= 18:
-            # For 12-18 seconds, use 2 equal chunks to avoid remainders
-            chunk_duration = duration / 2
-            print(f"🎵 Using 2 equal chunks of ~{chunk_duration:.2f}s each")
-        elif duration <= 24:
-            # For 18-24 seconds, use 3 equal chunks
-            chunk_duration = duration / 3
-            print(f"🎵 Using 3 equal chunks of ~{chunk_duration:.2f}s each")
-        elif duration <= 30:
-            # For 24-30 seconds, use 4 equal chunks
-            chunk_duration = duration / 4
-            print(f"🎵 Using 4 equal chunks of ~{chunk_duration:.2f}s each")
-        else:
-            # For longer content, use 6-second chunks but handle remainders better
-            chunk_duration = 6.0
-            num_chunks = int(duration / chunk_duration)
-            remainder = duration % chunk_duration
+        """Split audio into chunks with comprehensive debug logging"""
+        try:
+            print(f"🔍 [DEBUG] Starting audio splitting for: {audio_path}")
             
-            if remainder > 0:
-                if remainder < 3.0:  # Increased threshold for better stability
-                    # Distribute remainder evenly among existing chunks
-                    print(f"🎵 Adjusting chunking to avoid very short chunks (remainder: {remainder:.2f}s)")
-                    chunk_duration = duration / num_chunks
-                    print(f"🎵 Using {num_chunks} chunks of ~{chunk_duration:.2f}s each")
-                else:
-                    # Add one more chunk for the remainder
-                    num_chunks += 1
-                    print(f"🎵 Splitting into {num_chunks} chunks of ~{chunk_duration:.2f}s each")
-            else:
-                print(f"🎵 Splitting into {num_chunks} chunks of ~{chunk_duration:.2f}s each")
-        
-        # Use ffmpeg with improved settings for better chunk alignment and synchronization
-        temp_dir = tempfile.mkdtemp(prefix="ultra_chunks_")
-        
-        cmd = [
-            "ffmpeg", "-i", audio_path,
-            "-f", "segment",
-            "-segment_time", str(chunk_duration),
-            "-c", "copy",  # Use copy to maintain audio quality
-            "-reset_timestamps", "1",
-            "-avoid_negative_ts", "make_zero",  # Handle negative timestamps
-            "-fflags", "+genpts",  # Generate presentation timestamps
-            "-segment_start_number", "0",  # Ensure proper numbering
-            "-segment_list", os.path.join(temp_dir, "chunk_list.txt"),  # Create segment list for validation
-            os.path.join(temp_dir, "chunk_%03d.mp3"),
-            "-y"
-        ]
-        
-        print(f"🔧 Running ffmpeg command: {' '.join(cmd)}")
-        
-        process = await asyncio.create_subprocess_exec(
-            *cmd,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE
-        )
-        
-        stdout, stderr = await process.communicate()
-        
-        if process.returncode != 0:
-            print(f"❌ FFmpeg error: {stderr.decode()}")
-            # Fallback: return original audio as single chunk
-            return [audio_path]
-        
-        # Get chunk files and verify they exist with proper ordering
-        chunk_files = []
-        total_chunk_duration = 0
-        
-        # Read segment list if available for validation
-        segment_list_path = os.path.join(temp_dir, "chunk_list.txt")
-        expected_chunks = []
-        if os.path.exists(segment_list_path):
-            try:
-                with open(segment_list_path, 'r') as f:
-                    for line in f:
-                        if line.strip() and not line.startswith('#'):
-                            expected_chunks.append(line.strip())
-                print(f"📋 Expected chunks from segment list: {len(expected_chunks)}")
-            except Exception as e:
-                print(f"⚠️ Could not read segment list: {e}")
-        
-        # Check for all possible chunk files and sort them properly
-        for i in range(10):  # Check more chunks in case of rounding issues
-            chunk_path = os.path.join(temp_dir, f"chunk_{i:03d}.mp3")
-            if os.path.exists(chunk_path) and os.path.getsize(chunk_path) > 0:
-                # Get duration of this chunk
-                chunk_duration_actual = await self._get_audio_duration_fast(chunk_path)
-                if chunk_duration_actual > 1.0:  # Increased threshold for better stability
-                    total_chunk_duration += chunk_duration_actual
-                    chunk_files.append(chunk_path)
-                    print(f"✅ Chunk {i}: {chunk_duration_actual:.2f}s")
-                else:
-                    print(f"⚠️ Chunk {i} too short, skipping: {chunk_duration_actual:.2f}s")
-            else:
-                # Stop when we find the first missing chunk
-                break
-        
-        print(f"✅ Split audio into {len(chunk_files)} chunks")
-        print(f"✅ Total chunk duration: {total_chunk_duration:.2f}s (original: {duration:.2f}s)")
-        
-        # Verify we're not losing audio content
-        if abs(total_chunk_duration - duration) > 1.0:  # Allow 1s tolerance
-            print(f"⚠️ Duration mismatch! Original: {duration:.2f}s, Chunks: {total_chunk_duration:.2f}s")
-            print(f"⚠️ Falling back to single chunk processing")
-            return [audio_path]
-        
-        # Check for very short chunks that could cause issues
-        for i, chunk in enumerate(chunk_files):
-            chunk_duration_actual = await self._get_audio_duration_fast(chunk)
-            if chunk_duration_actual < 2.5:  # Increased threshold for better stability
-                print(f"⚠️ Very short chunk {i} detected: {chunk_duration_actual:.2f}s")
-                print(f"⚠️ Falling back to single chunk processing")
+            # Get audio duration
+            audio_duration = await self._get_audio_duration_fast(audio_path)
+            print(f"🔍 [DEBUG] Audio duration: {audio_duration:.3f}s")
+            
+            # Determine chunking strategy
+            if audio_duration <= 12:
+                print(f"🔍 [DEBUG] Audio ≤12s - using single chunk")
                 return [audio_path]
-        
-        # Verify chunk order and continuity
-        if len(chunk_files) > 1:
-            print(f"🔍 Verifying chunk continuity...")
-            for i in range(len(chunk_files) - 1):
-                chunk1_duration = await self._get_audio_duration_fast(chunk_files[i])
-                chunk2_duration = await self._get_audio_duration_fast(chunk_files[i + 1])
-                print(f"🔍 Chunk {i}: {chunk1_duration:.2f}s -> Chunk {i+1}: {chunk2_duration:.2f}s")
-        
-        # Ensure chunks are in correct order and remove any duplicates
-        chunk_files.sort()
-        unique_chunks = []
-        seen_chunks = set()
-        for chunk in chunk_files:
-            if chunk not in seen_chunks:
-                seen_chunks.add(chunk)
-                unique_chunks.append(chunk)
-        
-        if len(unique_chunks) != len(chunk_files):
-            print(f"⚠️ Removed {len(chunk_files) - len(unique_chunks)} duplicate chunks")
-            chunk_files = unique_chunks
-        
-        return chunk_files
+            
+            # Calculate chunk size and count
+            chunk_duration = min(12, max(6, audio_duration / 2))
+            num_chunks = int(audio_duration / chunk_duration) + (1 if audio_duration % chunk_duration > 0 else 0)
+            
+            print(f"🔍 [DEBUG] Chunking strategy: {num_chunks} chunks of {chunk_duration:.1f}s each")
+            
+            # Create output directory
+            output_dir = "/tmp/audio_chunks"
+            os.makedirs(output_dir, exist_ok=True)
+            
+            # Split audio into chunks
+            chunk_paths = []
+            for i in range(num_chunks):
+                start_time = i * chunk_duration
+                end_time = min((i + 1) * chunk_duration, audio_duration)
+                
+                # Generate unique chunk filename
+                chunk_filename = f"chunk_{i:03d}_{start_time:.1f}s_to_{end_time:.1f}s.mp3"
+                chunk_path = os.path.join(output_dir, chunk_filename)
+                
+                print(f"🔍 [DEBUG] Creating chunk {i+1}/{num_chunks}: {start_time:.1f}s - {end_time:.1f}s -> {chunk_path}")
+                
+                # Extract chunk using ffmpeg
+                cmd = [
+                    "ffmpeg",
+                    "-i", audio_path,
+                    "-ss", str(start_time),
+                    "-t", str(end_time - start_time),
+                    "-c:a", "mp3",
+                    "-ar", "24000",
+                    "-y",
+                    chunk_path
+                ]
+                
+                result = subprocess.run(cmd, capture_output=True, text=True)
+                
+                if result.returncode != 0:
+                    print(f"❌ [DEBUG] Failed to create chunk {i+1}: {result.stderr}")
+                    continue
+                
+                # Verify chunk exists and has content
+                if os.path.exists(chunk_path) and os.path.getsize(chunk_path) > 1000:
+                    chunk_duration_actual = await self._get_audio_duration_fast(chunk_path)
+                    print(f"✅ [DEBUG] Chunk {i+1} created: {chunk_path} (duration: {chunk_duration_actual:.3f}s)")
+                    chunk_paths.append(chunk_path)
+                else:
+                    print(f"❌ [DEBUG] Chunk {i+1} validation failed: {chunk_path}")
+            
+            print(f"🔍 [DEBUG] Audio splitting complete: {len(chunk_paths)} chunks created")
+            for i, path in enumerate(chunk_paths):
+                print(f"   Chunk {i+1}: {path}")
+            
+            return chunk_paths
+            
+        except Exception as e:
+            print(f"❌ [DEBUG] Error splitting audio: {e}")
+            return [audio_path]
     
     async def _process_chunks_ultra_fast(self, audio_chunks: List[str], agent_type: str) -> List[str]:
-        """Process audio chunks with maximum parallelization, preserving order and preventing duplicates"""
-        print(f"🎬 Processing {len(audio_chunks)} chunks with max {self.max_parallel_chunks} parallel workers")
-        semaphore = asyncio.Semaphore(self.max_parallel_chunks)
-
-        # Track processed chunks to prevent duplicates
-        processed_chunks = set()
-        chunk_results = {}
-
+        """Process audio chunks in parallel with comprehensive debug logging"""
+        if not audio_chunks:
+            return []
+        
+        print(f"🔍 [DEBUG] Starting parallel chunk processing: {len(audio_chunks)} chunks")
+        
+        # Process chunks in parallel
         async def process_single_chunk(chunk_path: str, chunk_index: int) -> (int, str):
-            async with semaphore:
-                # Prevent duplicate processing
-                chunk_id = f"{chunk_path}_{chunk_index}"
-                if chunk_id in processed_chunks:
-                    print(f"⚠️ Chunk {chunk_index + 1} already processed, skipping duplicate")
-                    return chunk_index, ""
+            try:
+                print(f"🔍 [DEBUG] Processing chunk {chunk_index + 1}/{len(audio_chunks)}: {chunk_path}")
                 
-                processed_chunks.add(chunk_id)
-                print(f"🎬 Processing chunk {chunk_index + 1}/{len(audio_chunks)}: {chunk_path}")
-                try:
-                    video_path = await self._generate_single_video_local_ultra_fast(chunk_path, agent_type)
-                    print(f"✅ Chunk {chunk_index + 1} completed: {video_path}")
+                # Get chunk duration for logging
+                chunk_duration = await self._get_audio_duration_fast(chunk_path)
+                print(f"🔍 [DEBUG] Chunk {chunk_index + 1} duration: {chunk_duration:.3f}s")
+                
+                # Generate video for this chunk
+                video_path = await self._generate_single_video_local_ultra_fast(chunk_path, agent_type)
+                
+                if video_path and os.path.exists(video_path):
+                    video_size = os.path.getsize(video_path)
+                    video_duration = await self._get_audio_duration_fast(video_path)
+                    print(f"✅ [DEBUG] Chunk {chunk_index + 1} video generated: {video_path}")
+                    print(f"   Size: {video_size:,} bytes, Duration: {video_duration:.3f}s")
                     return chunk_index, video_path
-                except Exception as e:
-                    print(f"❌ Chunk {chunk_index + 1} failed: {str(e)}")
-                    raise e
-
-        # Launch all chunk processing tasks
-        tasks = [process_single_chunk(chunk, i) for i, chunk in enumerate(audio_chunks)]
-        results = await asyncio.gather(*tasks, return_exceptions=True)
-
-        # Collect results in the correct order with duplicate prevention
-        ordered_video_paths = []
-        successful_chunks = 0
-        
-        for i, result in enumerate(results):
-            if isinstance(result, Exception):
-                print(f"❌ Chunk {i + 1} processing failed: {str(result)}")
-            elif isinstance(result, tuple) and len(result) == 2:
-                idx, path = result
-                if path and path not in ordered_video_paths:  # Prevent duplicate paths
-                    ordered_video_paths.append(path)
-                    successful_chunks += 1
-                    print(f"✅ Chunk {idx + 1} added to video paths: {path}")
-                elif path in ordered_video_paths:
-                    print(f"⚠️ Duplicate video path detected for chunk {idx + 1}, skipping")
                 else:
-                    print(f"⚠️ Empty video path for chunk {idx + 1}")
-            else:
-                print(f"❌ Unexpected result for chunk {i + 1}: {result}")
-
-        # Debug: print chunk order and check for duplicates
-        print(f"\n🔍 Final chunk order for combination:")
-        for i, path in enumerate(ordered_video_paths):
-            print(f"  Chunk {i+1}: {path}")
+                    print(f"❌ [DEBUG] Chunk {chunk_index + 1} video generation failed")
+                    return chunk_index, ""
+                    
+            except Exception as e:
+                print(f"❌ [DEBUG] Error processing chunk {chunk_index + 1}: {e}")
+                return chunk_index, ""
         
-        # Validate no duplicates in final list
-        if len(set(ordered_video_paths)) != len(ordered_video_paths):
-            print(f"⚠️ Duplicate chunk files detected in final combination!")
-            # Remove duplicates while preserving order
-            seen = set()
-            unique_paths = []
-            for path in ordered_video_paths:
-                if path not in seen:
-                    seen.add(path)
-                    unique_paths.append(path)
-            ordered_video_paths = unique_paths
-            print(f"✅ Removed duplicates, final count: {len(ordered_video_paths)}")
-
-        print(f"✅ Successfully processed {successful_chunks}/{len(audio_chunks)} chunks")
-        return ordered_video_paths
+        # Process all chunks
+        tasks = [process_single_chunk(chunk, i) for i, chunk in enumerate(audio_chunks)]
+        results = await asyncio.gather(*tasks)
+        
+        # Sort results by chunk index to preserve order
+        results.sort(key=lambda x: x[0])
+        video_paths = [result[1] for result in results if result[1]]
+        
+        print(f"🔍 [DEBUG] Chunk processing complete: {len(video_paths)} videos generated")
+        for i, path in enumerate(video_paths):
+            print(f"   Video {i+1}: {path}")
+        
+        return video_paths
     
     async def _run_wav2lip_ultra_fast(self, audio_path: str, avatar_path: str) -> str:
         """Run Wav2Lip with ultra-fast parameters and improved synchronization"""
@@ -494,15 +370,6 @@ class UltraFastProcessor:
         # Add timestamp to make cache key unique for each request
         timestamp = str(int(time.time() * 1000))[-6:]  # Last 6 digits of timestamp
         cache_key = f"ultra_wav2lip_{audio_hash}_{avatar_hash}_{timestamp}"
-        
-        # Temporarily disable caching to ensure fresh content
-        # Check cache
-        # output_dir = "/tmp/wav2lip_ultra_outputs"
-        # os.makedirs(output_dir, exist_ok=True)
-        # 
-        # cached_path = os.path.join(output_dir, f"{cache_key}.mp4")
-        # if os.path.exists(cached_path):
-        #     return cached_path
         
         # Ultra-fast Wav2Lip command with improved synchronization
         wav2lip_dir = os.path.join(os.path.dirname(__file__), "..", "Wav2Lip")
@@ -523,13 +390,41 @@ class UltraFastProcessor:
             fps = 10  # Consistent FPS for longer content
             batch_size = 64
         
+        # STEP 1: Create a video from the static avatar image
+        avatar_video_path = os.path.join("/tmp/wav2lip_ultra_outputs", f"avatar_video_{timestamp}.mp4")
+        
+        # Create a video with the static image repeated for the audio duration
+        avatar_cmd = [
+            "ffmpeg",
+            "-loop", "1",  # Loop the input image
+            "-i", avatar_path,
+            "-c:v", "libx264",
+            "-t", str(audio_duration),  # Set duration to match audio
+            "-pix_fmt", "yuv420p",
+            "-vf", "scale=480:480",  # Resize to standard size
+            "-r", str(fps),  # Set frame rate
+            "-avoid_negative_ts", "make_zero",  # Fix timestamp issues
+            "-fflags", "+genpts",  # Generate proper timestamps
+            avatar_video_path,
+            "-y"
+        ]
+        
+        print(f"🎬 Creating avatar video: {' '.join(avatar_cmd)}")
+        
+        avatar_result = subprocess.run(avatar_cmd, capture_output=True, text=True)
+        if avatar_result.returncode != 0:
+            print(f"❌ Avatar video creation failed: {avatar_result.stderr}")
+            raise Exception("Avatar video creation failed")
+        
+        print(f"✅ Avatar video created: {avatar_video_path}")
+        
+        # STEP 2: Run Wav2Lip with the avatar video (not static image)
         cmd = [
             "python", "inference.py",
             "--checkpoint_path", "checkpoints/wav2lip.pth",
-            "--face", avatar_path,
+            "--face", avatar_video_path,  # Use video instead of static image
             "--audio", audio_path,
             "--outfile", output_path,
-            "--static", "True",
             "--fps", str(fps),  # Consistent FPS for better sync
             "--resize_factor", "6",  # Maximum resize for speed
             "--pads", "0", "2", "0", "0",  # Minimal padding
@@ -558,6 +453,10 @@ class UltraFastProcessor:
         
         stdout, stderr = await process.communicate()
         
+        # Clean up avatar video
+        if os.path.exists(avatar_video_path):
+            os.remove(avatar_video_path)
+        
         # Check if Wav2Lip completed successfully
         if process.returncode != 0:
             print(f"❌ Wav2Lip failed with return code {process.returncode}")
@@ -574,57 +473,63 @@ class UltraFastProcessor:
             raise Exception("Wav2Lip output file too small")
         
         print(f"✅ Wav2Lip completed successfully: {output_path}")
-        return output_path
+        
+        # STEP 3: Fix video metadata to prevent looping issues
+        fixed_output_path = await self._fix_video_metadata(output_path)
+        
+        return fixed_output_path
     
     async def _combine_videos_with_improved_sync(self, video_paths: List[str]) -> str:
-        """Combine multiple videos with improved synchronization to prevent looping"""
+        """Combine multiple videos with comprehensive debug logging"""
         if not video_paths:
+            print("🔍 [DEBUG] No video paths to combine")
             return ""
         
         if len(video_paths) == 1:
+            print(f"🔍 [DEBUG] Single video, no combination needed: {video_paths[0]}")
             return video_paths[0]
         
         try:
-            print(f"[UltraFastProcessor] Combining {len(video_paths)} videos with improved sync:")
-            for i, path in enumerate(video_paths, 1):
-                print(f"[UltraFastProcessor] {i}. {path}")
+            print(f"🔍 [DEBUG] Starting video combination: {len(video_paths)} videos")
             
-            # Validate video paths and remove duplicates
-            unique_paths = []
-            seen_paths = set()
-            for path in video_paths:
-                if path not in seen_paths and os.path.exists(path):
-                    seen_paths.add(path)
-                    unique_paths.append(path)
-                elif path in seen_paths:
-                    print(f"⚠️ Duplicate video path detected and removed: {path}")
-                elif not os.path.exists(path):
-                    print(f"⚠️ Video path does not exist: {path}")
+            # Log all input videos with their details
+            for i, path in enumerate(video_paths):
+                if os.path.exists(path):
+                    size = os.path.getsize(path)
+                    duration = await self._get_audio_duration_fast(path)
+                    print(f"🔍 [DEBUG] Input video {i+1}: {path}")
+                    print(f"   Size: {size:,} bytes, Duration: {duration:.3f}s")
+                else:
+                    print(f"❌ [DEBUG] Input video {i+1} not found: {path}")
             
-            if len(unique_paths) != len(video_paths):
-                print(f"⚠️ Removed {len(video_paths) - len(unique_paths)} invalid/duplicate video paths")
-                video_paths = unique_paths
+            # Filter out invalid paths
+            valid_paths = [path for path in video_paths if os.path.exists(path)]
             
-            if not video_paths:
-                print(f"❌ No valid video paths to combine")
+            if not valid_paths:
+                print(f"❌ [DEBUG] No valid video paths to combine")
                 return ""
+            
+            print(f"🔍 [DEBUG] Valid videos for combination: {len(valid_paths)}")
             
             # Generate output path
             combined_hash = hashlib.md5()
-            for path in video_paths:
+            for path in valid_paths:
                 combined_hash.update(path.encode())
             cache_key = f"ultra_combined_{combined_hash.hexdigest()[:12]}"
             output_path = os.path.join("/tmp/wav2lip_ultra_outputs", f"{cache_key}.mp4")
             
-            # STEP 1: Create a concat file for more reliable combination
+            print(f"🔍 [DEBUG] Output path: {output_path}")
+            
+            # Create concat file with detailed logging
             concat_file = f"/tmp/concat_{int(time.time())}.txt"
+            print(f"🔍 [DEBUG] Creating concat file: {concat_file}")
+            
             with open(concat_file, 'w') as f:
-                for video_path in video_paths:
+                for i, video_path in enumerate(valid_paths):
                     f.write(f"file '{video_path}'\n")
+                    print(f"🔍 [DEBUG] Added to concat file: {video_path}")
             
-            print(f"[UltraFastProcessor] Concat file created with {len(video_paths)} videos")
-            
-            # STEP 2: Use concat demuxer with strict timing parameters
+            # Use concat demuxer with detailed logging
             cmd = [
                 "ffmpeg",
                 "-f", "concat",
@@ -637,39 +542,55 @@ class UltraFastProcessor:
                 "-b:a", "128k",
                 "-ar", "24000",
                 "-movflags", "+faststart",
-                "-avoid_negative_ts", "make_zero",
-                "-fflags", "+genpts",
-                "-async", "1",
-                "-vsync", "1",
-                "-max_interleave_delta", "0",
                 output_path,
                 "-y"
             ]
             
-            print(f"[UltraFastProcessor] Running ffmpeg with concat demuxer for reliable sync:")
-            print(f"[UltraFastProcessor] Command: {' '.join(cmd)}")
+            print(f"🔍 [DEBUG] Running FFmpeg command: {' '.join(cmd)}")
             
             result = subprocess.run(cmd, capture_output=True, text=True)
             
             # Clean up concat file
             if os.path.exists(concat_file):
                 os.remove(concat_file)
+                print(f"🔍 [DEBUG] Cleaned up concat file: {concat_file}")
             
             if result.returncode != 0:
-                print(f"❌ Video combination failed: {result.stderr}")
+                print(f"❌ [DEBUG] Video combination failed")
+                print(f"❌ [DEBUG] FFmpeg stderr: {result.stderr}")
                 return ""
             
-            print(f"✅ Video combination completed with improved sync: {output_path}")
-            
-            # STEP 3: Validate the combined video
-            if not os.path.exists(output_path) or os.path.getsize(output_path) < 1000:
-                print(f"❌ Combined video validation failed: {output_path}")
+            # Verify combined video
+            if os.path.exists(output_path):
+                combined_size = os.path.getsize(output_path)
+                combined_duration = await self._get_audio_duration_fast(output_path)
+                print(f"✅ [DEBUG] Video combination completed successfully")
+                print(f"   Output: {output_path}")
+                print(f"   Size: {combined_size:,} bytes")
+                print(f"   Duration: {combined_duration:.3f}s")
+                
+                # Calculate expected duration
+                expected_duration = sum([await self._get_audio_duration_fast(path) for path in valid_paths])
+                print(f"   Expected duration: {expected_duration:.3f}s")
+                print(f"   Duration difference: {abs(combined_duration - expected_duration):.3f}s")
+                
+                if abs(combined_duration - expected_duration) > 0.5:
+                    print(f"⚠️ [DEBUG] WARNING: Combined duration differs significantly from expected!")
+            else:
+                print(f"❌ [DEBUG] Combined video file not found: {output_path}")
                 return ""
             
-            return output_path
+            # Fix metadata
+            print(f"🔍 [DEBUG] Fixing video metadata...")
+            fixed_output_path = await self._fix_video_metadata(output_path)
+            
+            print(f"✅ [DEBUG] Video combination and metadata fixing complete: {fixed_output_path}")
+            return fixed_output_path
             
         except Exception as e:
-            print(f"❌ Error combining videos: {e}")
+            print(f"❌ [DEBUG] Error combining videos: {e}")
+            import traceback
+            print(f"❌ [DEBUG] Traceback: {traceback.format_exc()}")
             return ""
     
     async def _get_audio_duration_fast(self, audio_path: str) -> float:
@@ -813,14 +734,17 @@ class UltraFastProcessor:
         return web_url
     
     async def _fix_video_metadata(self, video_path: str) -> str:
-        """Fix video metadata to prevent looping and playback issues"""
+        """Fix video metadata while preserving exact timing to prevent any gaps"""
         try:
+            # Get original duration before fixing
+            original_duration = await self._get_audio_duration_fast(video_path)
+            
             # Create a new filename for the fixed video
             base_name = os.path.splitext(os.path.basename(video_path))[0]
             fixed_filename = f"{base_name}_fixed.mp4"
             fixed_path = os.path.join(os.path.dirname(video_path), fixed_filename)
             
-            # Comprehensive FFmpeg command to fix all potential playback issues
+            # Comprehensive FFmpeg command to fix metadata while preserving exact timing
             cmd = [
                 "ffmpeg",
                 "-i", video_path,
@@ -839,11 +763,13 @@ class UltraFastProcessor:
                 "-metadata", "title=VBVA Generated Video",  # Add metadata
                 "-metadata", "artist=VBVA System",
                 "-metadata", "comment=Generated by Video Based Virtual Assistant",
+                "-metadata", "creation_time=now",  # Set creation time
                 "-y",  # Overwrite output
                 fixed_path
             ]
             
-            print(f"[UltraFastProcessor] Fixing video metadata to prevent playback issues:")
+            print(f"[UltraFastProcessor] Fixing video metadata while preserving timing:")
+            print(f"[UltraFastProcessor] Original duration: {original_duration:.3f}s")
             print(f"[UltraFastProcessor] Command: {' '.join(cmd)}")
             
             process = await asyncio.create_subprocess_exec(
@@ -856,19 +782,44 @@ class UltraFastProcessor:
             
             if process.returncode != 0:
                 print(f"❌ Video metadata fix failed: {stderr.decode()}")
-                return video_path  # Return original if fix fails
+                # Return original path if fix fails
+                return video_path
             
             # Verify the fixed video exists and has content
             if not os.path.exists(fixed_path) or os.path.getsize(fixed_path) < 1000:
-                print(f"⚠️ Fixed video validation failed, using original")
+                print(f"❌ Fixed video validation failed: {fixed_path}")
                 return video_path
             
+            # CRITICAL: Verify timing is preserved
+            fixed_duration = await self._get_audio_duration_fast(fixed_path)
+            duration_diff = abs(fixed_duration - original_duration)
+            
+            print(f"📊 Fixed video duration: {fixed_duration:.3f}s")
+            print(f"📊 Duration difference: {duration_diff:.3f}s")
+            
+            if duration_diff > 0.1:  # Allow only 100ms tolerance
+                print(f"❌ CRITICAL: Metadata fix changed video duration! Original: {original_duration:.3f}s, Fixed: {fixed_duration:.3f}s")
+                print(f"❌ Using original video to preserve timing")
+                return video_path
+            elif duration_diff > 0.01:  # Warn if difference is more than 10ms
+                print(f"⚠️ Small duration change: {duration_diff:.3f}s (acceptable)")
+            
             print(f"✅ Video metadata fixed successfully: {fixed_path}")
+            print(f"✅ Timing preserved: {original_duration:.3f}s → {fixed_duration:.3f}s")
+            
+            # Clean up original file if fix was successful
+            if os.path.exists(video_path) and video_path != fixed_path:
+                try:
+                    os.remove(video_path)
+                    print(f"🗑️ Cleaned up original video: {video_path}")
+                except Exception as e:
+                    print(f"⚠️ Could not clean up original video: {e}")
+            
             return fixed_path
             
         except Exception as e:
-            print(f"❌ Video metadata fix error: {str(e)}")
-            return video_path  # Return original if any error occurs
+            print(f"❌ Error fixing video metadata: {e}")
+            return video_path
     
     def get_ultra_fast_status(self) -> Dict:
         """Get ultra-fast processing status"""

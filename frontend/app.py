@@ -468,6 +468,10 @@ def robust_video_display(video_url: str):
     video_displayed = False
     errors = []
     
+    # Add cache-busting parameter to prevent browser caching issues
+    cache_buster = int(time.time())
+    video_url_with_cache_bust = f"{video_url}?cb={cache_buster}"
+    
     # Pre-validate the video URL
     if not validate_video_url(video_url):
         st.error(f"❌ Invalid video URL: {video_url}")
@@ -475,39 +479,40 @@ def robust_video_display(video_url: str):
         st.info("🔄 Try refreshing the page or starting a new session")
         return
     
-    # Method 1: Direct st.video() with error handling
+    # Method 1: Direct st.video() with error handling (simplified)
     try:
-        st.video(video_url)
+        st.video(video_url_with_cache_bust)
         video_displayed = True
-        # Don't show success message here to avoid clutter - video is already visible
+        st.success("✅ Video displayed successfully!")
     except Exception as e:
         errors.append(f"Direct video display: {str(e)}")
+        st.warning("⚠️ Direct video display failed, trying alternative methods...")
     
-    # Method 2: Test URL accessibility and try again with different approach
+    # Method 2: Simple HTML video player without complex JavaScript
     if not video_displayed:
         try:
-            st.info("🔍 Testing video URL accessibility...")
-            test_response = requests.get(video_url, timeout=10, stream=True)
-            if test_response.status_code == 200:
-                st.success(f"✅ Video URL accessible (Status: {test_response.status_code})")
-                
-                # Try HTML video player with better configuration
-                try:
-                    html_video = f"""
-                    <video width='100%' height='400px' controls preload='metadata'>
-                        <source src='{video_url}' type='video/mp4'>
-                        Your browser does not support the video tag.
-                    </video>
-                    """
-                    st.markdown(html_video, unsafe_allow_html=True)
-                    video_displayed = True
-                    st.success("✅ Video displayed with HTML player!")
-                except Exception as e2:
-                    errors.append(f"HTML video player: {str(e2)}")
-            else:
-                errors.append(f"Video URL not accessible: {test_response.status_code}")
+            st.info("🔄 Trying simple HTML video player...")
+            
+            # Simple HTML video player with basic controls
+            html_video = f"""
+            <div style="text-align: center; margin: 20px 0;">
+                <video 
+                    width="100%" 
+                    height="400px" 
+                    controls 
+                    preload="metadata"
+                    style="border: 1px solid #ddd; border-radius: 8px; max-width: 100%;"
+                >
+                    <source src="{video_url_with_cache_bust}" type="video/mp4">
+                    Your browser does not support the video tag.
+                </video>
+            </div>
+            """
+            st.markdown(html_video, unsafe_allow_html=True)
+            video_displayed = True
+            st.success("✅ Video displayed with HTML player!")
         except Exception as e:
-            errors.append(f"Error testing video URL: {str(e)}")
+            errors.append(f"HTML video player: {str(e)}")
     
     # Method 3: Alternative HTML video player with different configuration
     if not video_displayed:
@@ -519,11 +524,10 @@ def robust_video_display(video_url: str):
                 <video 
                     controls 
                     style="max-width: 100%; height: auto; border: 1px solid #ddd; border-radius: 8px;"
-                    preload="none"
-                    poster="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjQiIGhlaWdodD0iNjQiIHZpZXdCb3g9IjAgMCA2NCA2NCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiBmaWxsPSIjRjVGNUY1Ii8+CjxwYXRoIGQ9Ik0yNCAxNkw0MCAzMkwyNCA0OFYxNloiIGZpbGw9IiM5Q0E2RjUiLz4KPC9zdmc+"
+                    preload="metadata"
                 >
-                    <source src="{video_url}" type="video/mp4">
-                    <p>Your browser does not support the video tag. <a href="{video_url}" target="_blank">Click here to download the video</a></p>
+                    <source src="{video_url_with_cache_bust}" type="video/mp4">
+                    <p>Your browser does not support the video tag. <a href="{video_url_with_cache_bust}" target="_blank">Click here to download the video</a></p>
                 </video>
             </div>
             """
@@ -533,61 +537,45 @@ def robust_video_display(video_url: str):
         except Exception as e:
             errors.append(f"Alternative HTML video player: {str(e)}")
     
-    # Method 4: Iframe embed as fallback
+    # Method 4: Direct download link as fallback
     if not video_displayed:
-        st.info("🔄 Trying iframe embed...")
+        st.info("🔄 Providing direct download link...")
         try:
-            # Create a simple iframe that might work better in some browsers
-            iframe_html = f"""
-            <div style="text-align: center; margin: 20px 0;">
-                <iframe 
-                    src="{video_url}" 
-                    width="100%" 
-                    height="400" 
-                    frameborder="0" 
-                    allowfullscreen
-                    style="border: 1px solid #ddd; border-radius: 8px;"
-                >
-                    <p>Your browser does not support iframes. <a href="{video_url}" target="_blank">Click here to view the video</a></p>
-                </iframe>
-            </div>
-            """
-            st.markdown(iframe_html, unsafe_allow_html=True)
+            # Create a download button
+            st.markdown(f"""
+            <a href="{video_url_with_cache_bust}" target="_blank" style="
+                display: inline-block;
+                background-color: #4CAF50;
+                color: white;
+                padding: 10px 20px;
+                text-decoration: none;
+                border-radius: 5px;
+                margin: 10px 0;
+            ">
+                📥 Download Video
+            </a>
+            """, unsafe_allow_html=True)
+            
+            st.success("✅ Download link provided!")
             video_displayed = True
-            st.success("✅ Video displayed with iframe embed!")
         except Exception as e:
-            errors.append(f"Iframe embed: {str(e)}")
+            errors.append(f"Download link: {str(e)}")
     
     # Only show errors if ALL methods failed
     if not video_displayed:
         st.error("❌ All video display methods failed")
         st.info("📥 Alternative viewing options:")
         
-        # Create a download button
-        st.markdown(f"""
-        <a href="{video_url}" target="_blank" style="
-            display: inline-block;
-            background-color: #4CAF50;
-            color: white;
-            padding: 10px 20px;
-            text-decoration: none;
-            border-radius: 5px;
-            margin: 10px 0;
-        ">
-            📥 Download Video
-        </a>
-        """, unsafe_allow_html=True)
-        
         # Provide manual instructions
         st.info("💡 Manual viewing instructions:")
         st.markdown("""
-        1. **Right-click the download link above** and select "Open in new tab"
-        2. **Or copy this URL** and paste it in a new browser tab:
+        1. **Copy this URL** and paste it in a new browser tab:
         """)
-        st.code(video_url)
+        st.code(video_url_with_cache_bust)
         st.markdown("""
-        3. **Or try refreshing the page** and generating the video again
-        4. **Check your browser's video codec support** - try Chrome or Firefox
+        2. **Or try refreshing the page** and generating the video again
+        3. **Check your browser's video codec support** - try Chrome or Firefox
+        4. **Clear browser cache** if the video seems to start from the end
         """)
         
         # Show video info
@@ -605,7 +593,7 @@ def robust_video_display(video_url: str):
                 st.text(f"• {error}")
     else:
         # Video was displayed successfully - show a subtle success indicator
-        st.success("✅ Video ready for playback")
+        st.info("💡 If the video appears to start from the end, try refreshing the page to clear browser cache.")
 
 def clear_cached_video_urls():
     """Clear all cached video URLs from session state to prevent caching issues"""

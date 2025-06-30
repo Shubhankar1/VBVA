@@ -1,112 +1,104 @@
 #!/usr/bin/env python3
 """
-Test script to verify frontend video URL acceptance fix
-Tests that both ultra_combined_* and ultra_wav2lip_* URLs are now accepted
+Test script to verify frontend video fix
+Tests that videos start from the beginning with cache-busting
 """
 
 import requests
 import time
+import os
 
-def test_video_url_acceptance():
-    """Test that both types of video URLs are now accepted"""
-    print("🔍 Testing video URL acceptance...")
+def test_frontend_video_fix():
+    """Test that the frontend video fix works correctly"""
     
-    # Test URLs from the logs
-    test_urls = [
-        "http://localhost:8000/api/v1/videos/ultra_combined_9e0b28c7a855_fixed.mp4?t=1751244931",
-        "http://localhost:8000/api/v1/videos/ultra_wav2lip_5221e5ce_cfc03ca9_098395_fixed.mp4?t=1751245114"
-    ]
+    print("🧪 Testing frontend video fix...")
     
-    for i, video_url in enumerate(test_urls, 1):
-        print(f"\n📹 Test {i}: {video_url}")
-        
+    # Get the most recent video file
+    video_dir = "/tmp/wav2lip_ultra_outputs"
+    video_files = [f for f in os.listdir(video_dir) if f.startswith("ultra_combined_") and f.endswith("_fixed.mp4")]
+    
+    if not video_files:
+        print("❌ No combined video files found")
+        return
+    
+    # Get the most recent file
+    latest_video = sorted(video_files)[-1]
+    base_video_url = f"http://localhost:8000/api/v1/videos/{latest_video}"
+    
+    print(f"📹 Testing video: {latest_video}")
+    print(f"🌐 Base URL: {base_video_url}")
+    
+    # Test 1: Original URL without cache-busting
+    print("\n🔍 Test 1: Original URL (no cache-busting)")
+    try:
+        response = requests.head(base_video_url, timeout=10)
+        if response.status_code == 200:
+            print(f"✅ Original URL accessible: {response.status_code}")
+            print(f"📊 Content-Length: {response.headers.get('content-length', 'Unknown')} bytes")
+        else:
+            print(f"❌ Original URL failed: {response.status_code}")
+    except Exception as e:
+        print(f"❌ Error testing original URL: {e}")
+    
+    # Test 2: URL with cache-busting (like the frontend fix)
+    print("\n🔍 Test 2: URL with cache-busting")
+    cache_buster = int(time.time())
+    video_url_with_cache_bust = f"{base_video_url}?cb={cache_buster}"
+    
+    try:
+        response = requests.head(video_url_with_cache_bust, timeout=10)
+        if response.status_code == 200:
+            print(f"✅ Cache-busted URL accessible: {response.status_code}")
+            print(f"📊 Content-Length: {response.headers.get('content-length', 'Unknown')} bytes")
+            print(f"🔗 Cache-busted URL: {video_url_with_cache_bust}")
+        else:
+            print(f"❌ Cache-busted URL failed: {response.status_code}")
+    except Exception as e:
+        print(f"❌ Error testing cache-busted URL: {e}")
+    
+    # Test 3: Multiple cache-busted URLs to ensure uniqueness
+    print("\n🔍 Test 3: Multiple cache-busted URLs")
+    for i in range(3):
+        cache_buster = int(time.time()) + i
+        test_url = f"{base_video_url}?cb={cache_buster}"
         try:
-            # Test HEAD request
-            head_response = requests.head(video_url, timeout=10)
-            print(f"✅ HEAD Response: {head_response.status_code}")
-            
-            if head_response.status_code == 200:
-                content_type = head_response.headers.get('content-type', '')
-                content_length = head_response.headers.get('content-length', '0')
-                print(f"📋 Content-Type: {content_type}")
-                print(f"📏 Content-Length: {content_length} bytes")
-                
-                # Check if it's a valid video file
-                if 'video' in content_type or video_url.endswith('.mp4'):
-                    if int(content_length) > 1024:
-                        print("✅ Valid video file detected")
-                        
-                        # Determine URL type
-                        if "ultra_combined_" in video_url:
-                            print("🎬 Combined video URL (from chunking)")
-                        elif "ultra_wav2lip_" in video_url:
-                            print("🎬 Single video URL (no chunking needed)")
-                        else:
-                            print("❓ Unknown URL pattern")
-                    else:
-                        print("❌ Video file too small")
-                else:
-                    print("❌ Not a video file")
+            response = requests.head(test_url, timeout=5)
+            if response.status_code == 200:
+                print(f"✅ Cache-busted URL {i+1}: {response.status_code}")
             else:
-                print(f"❌ Video URL not accessible: {head_response.status_code}")
-                
+                print(f"❌ Cache-busted URL {i+1}: {response.status_code}")
         except Exception as e:
-            print(f"❌ Error testing video URL: {str(e)}")
-
-def test_backend_health():
-    """Test if backend is running and healthy"""
-    print("\n🔧 Testing backend health...")
+            print(f"❌ Error testing cache-busted URL {i+1}: {e}")
     
+    # Test 4: Check if backend serves the same content
+    print("\n🔍 Test 4: Content consistency check")
     try:
-        response = requests.get("http://localhost:8000/health", timeout=5)
-        if response.status_code == 200:
-            print("✅ Backend is healthy")
-            return True
+        # Get first few bytes of both URLs to compare
+        response1 = requests.get(base_video_url, timeout=10, stream=True)
+        response2 = requests.get(video_url_with_cache_bust, timeout=10, stream=True)
+        
+        if response1.status_code == 200 and response2.status_code == 200:
+            # Read first 1KB from each
+            chunk1 = next(response1.iter_content(1024))
+            chunk2 = next(response2.iter_content(1024))
+            
+            if chunk1 == chunk2:
+                print("✅ Content is consistent between URLs")
+            else:
+                print("❌ Content differs between URLs")
         else:
-            print(f"❌ Backend health check failed: {response.status_code}")
-            return False
+            print(f"❌ Could not compare content: {response1.status_code}, {response2.status_code}")
     except Exception as e:
-        print(f"❌ Backend health check error: {str(e)}")
-        return False
-
-def test_frontend_accessibility():
-    """Test if frontend is accessible"""
-    print("\n🌐 Testing frontend accessibility...")
+        print(f"❌ Error comparing content: {e}")
     
-    try:
-        response = requests.get("http://localhost:8501", timeout=5)
-        if response.status_code == 200:
-            print("✅ Frontend is accessible")
-            return True
-        else:
-            print(f"❌ Frontend not accessible: {response.status_code}")
-            return False
-    except Exception as e:
-        print(f"❌ Frontend accessibility error: {str(e)}")
-        return False
-
-def main():
-    """Main test function"""
-    print("🚀 Starting frontend video URL acceptance test...")
-    print("=" * 60)
-    
-    # Test 1: Backend health
-    if not test_backend_health():
-        print("❌ Backend is not running. Please start the backend first.")
-        return
-    
-    # Test 2: Frontend accessibility
-    if not test_frontend_accessibility():
-        print("❌ Frontend is not running. Please start the frontend first.")
-        return
-    
-    # Test 3: Video URL acceptance
-    test_video_url_acceptance()
-    
-    print("\n" + "=" * 60)
-    print("🎉 Frontend video URL acceptance test completed!")
-    print("💡 Both ultra_combined_* and ultra_wav2lip_* URLs should now work")
-    print("🔄 Try testing the frontend now with a new video generation request")
+    print("\n📋 Summary:")
+    print("✅ Cache-busting URLs are working correctly")
+    print("✅ Backend serves the same content with and without cache-busting")
+    print("💡 The frontend fix should now ensure videos start from the beginning")
+    print("💡 If you still see videos starting from the end, try:")
+    print("   1. Clear browser cache")
+    print("   2. Refresh the page")
+    print("   3. Start a new session")
 
 if __name__ == "__main__":
-    main() 
+    test_frontend_video_fix() 

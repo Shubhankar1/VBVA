@@ -7,6 +7,10 @@ import os
 from typing import List, Optional
 from pydantic_settings import BaseSettings
 from pydantic import Field
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 class Settings(BaseSettings):
     """Application settings"""
@@ -46,7 +50,7 @@ class Settings(BaseSettings):
     # Server Configuration
     host: str = Field(default="0.0.0.0", env="HOST")
     port: int = Field(default=8000, env="PORT")
-    debug: bool = Field(default=False, env="DEBUG")
+    debug: bool = Field(default=True, env="DEBUG")
     
     # CORS Configuration
     allowed_origins: List[str] = Field(

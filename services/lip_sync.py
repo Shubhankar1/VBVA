@@ -14,6 +14,7 @@ import json
 import hashlib
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
+import subprocess
 
 from config.settings import get_settings
 
@@ -586,29 +587,21 @@ class LipSyncService:
                     return temp_avatar.name
     
     async def _run_local_wav2lip(self, audio_path: str, avatar_path: str) -> str:
-        """Run local Wav2Lip inference with ultra-fast optimization"""
+        """Run local Wav2Lip with ultra-optimized settings"""
         try:
-            import subprocess
-            import uuid
-            import hashlib
-            
-            # Create cache key based on audio and avatar
+            # Create cache key for output
             with open(audio_path, 'rb') as f:
                 audio_hash = hashlib.md5(f.read()).hexdigest()[:8]
             with open(avatar_path, 'rb') as f:
                 avatar_hash = hashlib.md5(f.read()).hexdigest()[:8]
             
-            cache_key = f"ultra_wav2lip_{audio_hash}_{avatar_hash}"
+            # Add timestamp to make cache key unique for each request
+            timestamp = str(int(time.time() * 1000))[-6:]  # Last 6 digits of timestamp
+            cache_key = f"wav2lip_{audio_hash}_{avatar_hash}_{timestamp}"
             
             # Create output directory
-            output_dir = "/tmp/wav2lip_ultra_outputs"
+            output_dir = "/tmp/wav2lip_outputs"
             os.makedirs(output_dir, exist_ok=True)
-            
-            # Check aggressive cache first
-            cached_path = os.path.join(output_dir, f"{cache_key}.mp4")
-            if os.path.exists(cached_path):
-                print(f"🚀 Using ultra-cached video: {cached_path}")
-                return cached_path
             
             # Generate unique output filename
             output_filename = f"{cache_key}.mp4"
@@ -617,18 +610,57 @@ class LipSyncService:
             # Get the path to Wav2Lip directory
             wav2lip_dir = os.path.join(os.path.dirname(__file__), "..", "Wav2Lip")
             
-            # Ultra-optimized Wav2Lip command for maximum speed
+            # Get audio duration to adjust parameters
+            audio_duration = await self._get_audio_duration(audio_path)
+            
+            # Adjust parameters based on audio duration for better synchronization
+            if audio_duration <= 4:
+                fps = 10  # Lower FPS for very short content
+                batch_size = 32
+            elif audio_duration <= 8:
+                fps = 10  # Standard FPS for short content
+                batch_size = 64
+            else:
+                fps = 10  # Consistent FPS for longer content
+                batch_size = 64
+            
+            # STEP 1: Create a video from the static avatar image
+            avatar_video_path = os.path.join("/tmp/wav2lip_outputs", f"avatar_video_{timestamp}.mp4")
+            
+            # Create a video with the static image repeated for the audio duration
+            avatar_cmd = [
+                "ffmpeg",
+                "-loop", "1",  # Loop the input image
+                "-i", avatar_path,
+                "-c:v", "libx264",
+                "-t", str(audio_duration),  # Set duration to match audio
+                "-pix_fmt", "yuv420p",
+                "-vf", "scale=480:480",  # Resize to standard size
+                "-r", str(fps),  # Set frame rate
+                avatar_video_path,
+                "-y"
+            ]
+            
+            print(f"🎬 Creating avatar video: {' '.join(avatar_cmd)}")
+            
+            avatar_result = subprocess.run(avatar_cmd, capture_output=True, text=True)
+            if avatar_result.returncode != 0:
+                print(f"❌ Avatar video creation failed: {avatar_result.stderr}")
+                raise Exception("Avatar video creation failed")
+            
+            print(f"✅ Avatar video created: {avatar_video_path}")
+            
+            # STEP 2: Run Wav2Lip with the avatar video (not static image)
             cmd = [
                 "python", "inference.py",
                 "--checkpoint_path", "checkpoints/wav2lip.pth",
-                "--face", avatar_path,
+                "--face", avatar_video_path,  # Use video instead of static image
                 "--audio", audio_path,
                 "--outfile", output_path,
-                "--static", "True",
-                "--fps", "12",  # Reduced FPS for ultra-speed (was 15)
+                "--fps", str(fps),  # Consistent FPS for better sync
                 "--resize_factor", "4",  # Increased resize factor for speed (was 2)
                 "--pads", "0", "5", "0", "0",  # Minimal padding
-                "--wav2lip_batch_size", "32",  # Increased batch size for speed
+                "--wav2lip_batch_size", str(batch_size),  # Adjusted batch size
                 "--nosmooth"  # Disable smoothing for speed
             ]
             
@@ -637,6 +669,7 @@ class LipSyncService:
                 cmd.extend(["--gpu", "0"])
             
             print(f"🚀 Running ultra-optimized Wav2Lip: {' '.join(cmd)}")
+            print(f"🎵 Audio duration: {audio_duration:.2f}s, FPS: {fps}, Batch size: {batch_size}")
             
             # Run Wav2Lip in a subprocess with optimized environment
             env = os.environ.copy()
@@ -655,6 +688,10 @@ class LipSyncService:
             )
             
             stdout, stderr = await process.communicate()
+            
+            # Clean up avatar video
+            if os.path.exists(avatar_video_path):
+                os.remove(avatar_video_path)
             
             if process.returncode != 0:
                 error_msg = stderr.decode() if stderr else "Unknown error"
