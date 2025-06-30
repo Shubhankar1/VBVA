@@ -28,6 +28,14 @@ except ImportError:
     ENHANCED_TTS_AVAILABLE = False
     print("⚠️ Enhanced TTS not available - using basic TTS")
 
+# Try to import video avatar processor
+try:
+    from services.video_avatar_processor import VideoAvatarProcessor
+    VIDEO_AVATAR_AVAILABLE = True
+except ImportError:
+    VIDEO_AVATAR_AVAILABLE = False
+    print("⚠️ Video Avatar Processor not available - using static images")
+
 @dataclass
 class UltraProcessingStats:
     """Ultra-fast processing statistics"""
@@ -55,6 +63,14 @@ class UltraFastProcessor:
             print("⚠️ Using Basic TTS Service")
         
         self.lip_sync_service = LipSyncService()
+        
+        # Use video avatar processor if available, otherwise fall back to static images
+        if VIDEO_AVATAR_AVAILABLE:
+            self.avatar_processor = VideoAvatarProcessor()
+            print("🎬 Using Video Avatar Processor with AI-generated videos")
+        else:
+            self.avatar_processor = None
+            print("⚠️ Using static image avatars")
         
         # Ultra-fast configuration
         self.max_parallel_chunks = 8  # Maximum parallel processing
@@ -390,39 +406,51 @@ class UltraFastProcessor:
             fps = 10  # Consistent FPS for longer content
             batch_size = 64
         
-        # STEP 1: Create a video from the static avatar image
+        # STEP 1: Determine if avatar is image or video and prepare accordingly
         avatar_video_path = os.path.join("/tmp/wav2lip_ultra_outputs", f"avatar_video_{timestamp}.mp4")
         
-        # Create a video with the static image repeated for the audio duration
-        avatar_cmd = [
-            "ffmpeg",
-            "-loop", "1",  # Loop the input image
-            "-i", avatar_path,
-            "-c:v", "libx264",
-            "-t", str(audio_duration),  # Set duration to match audio
-            "-pix_fmt", "yuv420p",
-            "-vf", "scale=480:480",  # Resize to standard size
-            "-r", str(fps),  # Set frame rate
-            "-avoid_negative_ts", "make_zero",  # Fix timestamp issues
-            "-fflags", "+genpts",  # Generate proper timestamps
-            avatar_video_path,
-            "-y"
-        ]
+        # Check if avatar is a video file (has video extension)
+        video_extensions = ['.mp4', '.avi', '.mov', '.mkv', '.webm']
+        is_video = any(avatar_path.lower().endswith(ext) for ext in video_extensions)
         
-        print(f"🎬 Creating avatar video: {' '.join(avatar_cmd)}")
+        if is_video:
+            # Avatar is already a video - use it directly
+            print(f"🎬 Avatar is already a video, using directly: {avatar_path}")
+            avatar_video_path = avatar_path
+        else:
+            # Avatar is an image - create a looped video from it
+            print(f"🎬 Avatar is an image, creating looped video: {avatar_path}")
+            
+            # Create a video with the static image repeated for the audio duration
+            avatar_cmd = [
+                "ffmpeg",
+                "-loop", "1",  # Loop the input image
+                "-i", avatar_path,
+                "-c:v", "libx264",
+                "-t", str(audio_duration),  # Set duration to match audio
+                "-pix_fmt", "yuv420p",
+                "-vf", "scale=480:480",  # Resize to standard size
+                "-r", str(fps),  # Set frame rate
+                "-avoid_negative_ts", "make_zero",  # Fix timestamp issues
+                "-fflags", "+genpts",  # Generate proper timestamps
+                avatar_video_path,
+                "-y"
+            ]
+            
+            print(f"🎬 Creating avatar video: {' '.join(avatar_cmd)}")
+            
+            avatar_result = subprocess.run(avatar_cmd, capture_output=True, text=True)
+            if avatar_result.returncode != 0:
+                print(f"❌ Avatar video creation failed: {avatar_result.stderr}")
+                raise Exception("Avatar video creation failed")
+            
+            print(f"✅ Avatar video created: {avatar_video_path}")
         
-        avatar_result = subprocess.run(avatar_cmd, capture_output=True, text=True)
-        if avatar_result.returncode != 0:
-            print(f"❌ Avatar video creation failed: {avatar_result.stderr}")
-            raise Exception("Avatar video creation failed")
-        
-        print(f"✅ Avatar video created: {avatar_video_path}")
-        
-        # STEP 2: Run Wav2Lip with the avatar video (not static image)
+        # STEP 2: Run Wav2Lip with the avatar video
         cmd = [
             "python", "inference.py",
             "--checkpoint_path", "checkpoints/wav2lip.pth",
-            "--face", avatar_video_path,  # Use video instead of static image
+            "--face", avatar_video_path,  # Use video (either original or created)
             "--audio", audio_path,
             "--outfile", output_path,
             "--fps", str(fps),  # Consistent FPS for better sync
@@ -453,8 +481,8 @@ class UltraFastProcessor:
         
         stdout, stderr = await process.communicate()
         
-        # Clean up avatar video
-        if os.path.exists(avatar_video_path):
+        # Clean up avatar video only if we created it (not if it was original video)
+        if not is_video and os.path.exists(avatar_video_path):
             os.remove(avatar_video_path)
         
         # Check if Wav2Lip completed successfully
@@ -633,8 +661,18 @@ class UltraFastProcessor:
                     return f.name
     
     async def _prepare_avatar_ultra_fast(self, agent_type: str) -> str:
-        """Prepare avatar with minimal processing"""
-        # Use absolute paths for Wav2Lip
+        """Prepare avatar with minimal processing - now uses AI-generated videos when available"""
+        
+        # Use video avatar processor if available
+        if self.avatar_processor:
+            try:
+                avatar_path = await self.avatar_processor.get_video_avatar(agent_type)
+                print(f"🎬 Using video avatar processor for {agent_type}: {avatar_path}")
+                return avatar_path
+            except Exception as e:
+                print(f"⚠️ Video avatar processor failed for {agent_type}: {e}, falling back to static images")
+        
+        # Fallback to static images (original behavior)
         base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         avatar_images = {
             "general": os.path.join(base_dir, "avatars", "general.jpg"),
@@ -649,6 +687,7 @@ class UltraFastProcessor:
             print(f"⚠️ Avatar not found: {avatar_path}, using general")
             avatar_path = avatar_images["general"]
         
+        print(f"🖼️ Using static image avatar for {agent_type}: {avatar_path}")
         return avatar_path
     
     def _get_audio_cache_key(self, text: str, agent_type: str) -> str:
