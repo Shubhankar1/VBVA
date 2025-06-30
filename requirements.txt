@@ -1,0 +1,83 @@
+# Core FastAPI dependencies
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+pydantic==2.5.0
+pydantic-settings==2.1.0
+
+# HTTP client
+httpx==0.25.2
+requests==2.31.0
+
+# AI/ML dependencies
+openai>=1.7.1
+elevenlabs==0.2.26
+
+# Audio/Video processing
+librosa==0.10.1
+soundfile==0.12.1
+opencv-python==4.8.1.78
+numpy==1.24.4
+scipy==1.11.4
+
+# Wav2Lip dependencies
+torch==2.1.0
+torchvision==0.16.0
+torchaudio==2.1.0
+batch-face==1.5.2
+sixdrepnet==0.1.6
+mediapipe==0.10.18
+numba==0.58.1
+
+# Frontend
+streamlit==1.28.1
+
+# Database (optional)
+sqlalchemy==2.0.23
+alembic==1.12.1
+
+# Caching
+redis==5.0.1
+
+# Monitoring & Logging
+prometheus-client==0.19.0
+structlog==23.2.0
+
+# Security
+python-multipart==0.0.6
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+
+# Utilities
+python-dotenv==1.0.0
+click==8.1.7
+tqdm==4.66.1
+
+# Multi-Agent Orchestration
+langgraph==0.0.20
+langchain
+langchain-openai
+crewai==0.11.0
+
+# Whisper
+whisper==1.1.10
+replicate==0.22.0
+
+# Audio Processing
+pydub==0.25.1
+
+# Video Processing
+moviepy==1.0.3
+ffmpeg-python==0.2.0
+
+# Web Interface
+streamlit-webrtc==0.47.1
+
+# Development
+pytest==7.4.3
+pytest-asyncio==0.21.1
+black==23.11.0
+isort==5.12.0
+flake8==6.1.0
+
+# Deployment
+gunicorn==21.2.0 
