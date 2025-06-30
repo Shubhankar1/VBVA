@@ -1,0 +1,103 @@
+# Environment variables and secrets
+.env
+.env.local
+.env.development
+.env.test
+.env.production
+.env.save
+*.env
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv/
+.env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Logs
+*.log
+logs/
+backend.log
+frontend.log
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.temp
+
+# Uploads and outputs
+uploads/
+outputs/
+results/
+*.mp4
+*.mp3
+*.wav
+*.avi
+*.mov
+
+# Cache
+cache/
+.cache/
+__pycache__/
+
+# Model files and checkpoints
+*.pth
+*.pt
+*.ckpt
+checkpoints/
+models/
+
+# API keys and secrets
+secrets.json
+api_keys.json
+*.key
+*.pem
+
+# Docker
+.dockerignore
+
+# Node modules (if any frontend dependencies)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log* 
