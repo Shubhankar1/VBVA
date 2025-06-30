@@ -60,22 +60,21 @@ async def test_video_only_approach():
         else:
             print(f"  ❌ No avatar found")
     
-    # Test 3: Create placeholder videos for testing
+    # Test 3: Create placeholder videos for testing (only if missing)
     print("\n🎬 Creating Placeholder Videos for Testing:")
-    
     for agent_type in ["general", "hotel", "airport", "sales"]:
+        ai_video_path = processor.ai_generated_dir / processor.video_configs[agent_type]["ai_video"]
+        if ai_video_path.exists():
+            print(f"  ⏩ Skipping placeholder for {agent_type} (already exists: {ai_video_path.name})")
+            continue
         print(f"\nCreating placeholder for {agent_type}...")
-        
-        start_time = time.time()
-        placeholder_path = await processor.create_video_placeholder(agent_type, duration=5.0)
-        creation_time = time.time() - start_time
-        
-        if placeholder_path:
-            file_size = os.path.getsize(placeholder_path) / (1024 * 1024)  # MB
-            print(f"  ✅ Created: {os.path.basename(placeholder_path)} ({file_size:.2f} MB)")
-            print(f"  ⏱️ Creation time: {creation_time:.2f}s")
+        placeholder = await processor.create_video_placeholder(agent_type)
+        if placeholder:
+            size = os.path.getsize(placeholder) / (1024 * 1024)
+            print(f"  ✅ Created: {os.path.basename(placeholder)} ({size:.2f} MB)")
+            print(f"  ⏱️ Creation time: {time.time() - start_time:.2f}s")
         else:
-            print(f"  ❌ Failed to create placeholder")
+            print(f"  ❌ Failed to create placeholder for {agent_type}")
     
     # Test 4: Test video validation
     print("\n🔍 Testing Video Validation:")

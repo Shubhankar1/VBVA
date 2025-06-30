@@ -47,9 +47,9 @@ class EnhancedTTSService:
         os.makedirs(self.cache_dir, exist_ok=True)
         
         # Provider availability
-        self.elevenlabs_enabled = ELEVENLABS_AVAILABLE
-        self.gtts_enabled = GTTS_AVAILABLE
-        self.offline_enabled = True
+        self.elevenlabs_enabled = False  # Force disable ElevenLabs
+        self.gtts_enabled = True         # Force enable gTTS
+        self.offline_enabled = False     # Force disable offline TTS
         
         # Rate limiting configuration
         self.last_elevenlabs_call = 0
