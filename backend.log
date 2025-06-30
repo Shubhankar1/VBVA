@@ -1,0 +1,187 @@
+INFO:     Will watch for changes in these directories: ['/Users/shubhankarmittal/Desktop/Gen AI/Video Based Virtual Assistant/VBVA-1']
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     Started reloader process [98939] using WatchFiles
+INFO:     Started server process [98959]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     127.0.0.1:60589 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60591 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60593 - "GET /api/v1/agents HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60687 - "GET /health HTTP/1.1" 200 OK
+
+================================================================================
+💬 USER QUESTION (CHAT): Give me a one liner in 220 characters
+📋 Details: session_id=None, agent_type=general
+================================================================================
+
+================================================================================
+💬 USER QUESTION (CHAT): Give me a one liner in 220 characters
+📋 Details: session_id=14bd23fc-a14f-4651-a99c-411d2758f8d4, agent_type=general
+================================================================================
+🔄 Preparing graph state
+HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+
+🤖 GENERAL AGENT RESPONSE:
+   "Embrace the chaos of life, for within its unpredictable nature lies the beauty of endless possibilities, where dreams take flight and every moment is a chance to dance with destiny and shape your own extraordinary journey."
+--------------------------------------------------------------------------------
+🔍 Answer validation: verified
+🔍 Confidence: 1.00
+🔍 Issues: 0
+✅ Graph result: {'session_id': '14bd23fc-a14f-4651-a99c-411d2758f8d4', 'input_text': 'Give me a one liner in 220 characters', 'agent_type': 'general', 'response': '"Embrace the chaos of life, for within its unpredictable nature lies the beauty of endless possibilities, where dreams take flight and every moment is a chance to dance with destiny and shape your own extraordinary journey."', 'audio_url': None, 'video_url': None, 'need_audio': False, 'need_video': False, 'validation_result': {'is_complete': True, 'completeness_level': 'verified', 'confidence_score': 1.0, 'issues': [], 'suggestions': [], 'validation_time': 0.0009257793426513672, 'text_length': 224, 'word_count': 36}}
+Orchestrator result: {'session_id': '14bd23fc-a14f-4651-a99c-411d2758f8d4', 'input_text': 'Give me a one liner in 220 characters', 'agent_type': 'general', 'response': '"Embrace the chaos of life, for within its unpredictable nature lies the beauty of endless possibilities, where dreams take flight and every moment is a chance to dance with destiny and shape your own extraordinary journey."', 'audio_url': None, 'video_url': None, 'need_audio': False, 'need_video': False, 'validation_result': {'is_complete': True, 'completeness_level': 'verified', 'confidence_score': 1.0, 'issues': [], 'suggestions': [], 'validation_time': 0.0009257793426513672, 'text_length': 224, 'word_count': 36}}
+INFO:     127.0.0.1:60689 - "POST /api/v1/chat HTTP/1.1" 200 OK
+📝 Using provided text as answer for video generation: 224 characters
+🔍 Validating answer completeness...
+🔍 Validation result: verified
+🔍 Confidence score: 1.00
+🔍 Issues found: 0
+✅ Answer validation passed: verified
+
+================================================================================
+🎬 VIDEO GENERATION REQUEST: "Embrace the chaos of life, for within its unpredictable nature lies the beauty of endless possibilities, where dreams take flight and every moment is a chance to dance with destiny and shape your own extraordinary journey."
+📋 Details: session_id=None, agent_type=general
+================================================================================
+🚀 Enhanced TTS Service initialized with providers:
+   ElevenLabs: ✅
+   gTTS: ✅
+   Offline: ✅
+⚠️ ElevenLabs API key not found
+✅ Offline TTS enabled
+✅ Offline TTS enabled
+🚀 Using Enhanced TTS Service with fallback options
+🎤 Trying gTTS fallback...
+✅ gTTS fallback successful: /tmp/tts_enhanced_cache/1751241140137.mp3
+🎬 Starting ultra-fast video generation for audio: /tmp/tts_enhanced_cache/1751241140137.mp3
+🎵 Audio duration: 16.03s
+🎬 Using parallel video generation for very long audio (16.03s)
+🎬 Only using chunking for content longer than 12 seconds
+🎬 Starting parallel video generation with fallback protection
+🎵 Splitting audio into chunks...
+🎵 Audio duration: 16.03s
+🎵 Using 2 equal chunks of ~8.02s each
+🔧 Running ffmpeg command: ffmpeg -i /tmp/tts_enhanced_cache/1751241140137.mp3 -f segment -segment_time 8.016 -c copy -reset_timestamps 1 -avoid_negative_ts make_zero -fflags +genpts -segment_start_number 0 /var/folders/ng/n5yqsq_15gqbr7z_6ssx_tvh0000gn/T/ultra_chunks_w23yt045/chunk_%03d.mp3 -y
+❌ FFmpeg error: ffmpeg version 7.1.1 Copyright (c) 2000-2025 the FFmpeg developers
+  built with Apple clang version 16.0.0 (clang-1600.0.26.6)
+  configuration: --prefix=/opt/homebrew/Cellar/ffmpeg/7.1.1_3 --enable-shared --enable-pthreads --enable-version3 --cc=clang --host-cflags= --host-ldflags='-Wl,-ld_classic' --enable-ffplay --enable-gnutls --enable-gpl --enable-libaom --enable-libaribb24 --enable-libbluray --enable-libdav1d --enable-libharfbuzz --enable-libjxl --enable-libmp3lame --enable-libopus --enable-librav1e --enable-librist --enable-librubberband --enable-libsnappy --enable-libsrt --enable-libssh --enable-libsvtav1 --enable-libtesseract --enable-libtheora --enable-libvidstab --enable-libvmaf --enable-libvorbis --enable-libvpx --enable-libwebp --enable-libx264 --enable-libx265 --enable-libxml2 --enable-libxvid --enable-lzma --enable-libfontconfig --enable-libfreetype --enable-frei0r --enable-libass --enable-libopencore-amrnb --enable-libopencore-amrwb --enable-libopenjpeg --enable-libspeex --enable-libsoxr --enable-libzmq --enable-libzimg --disable-libjack --disable-indev=jack --enable-videotoolbox --enable-audiotoolbox --enable-neon
+  libavutil      59. 39.100 / 59. 39.100
+  libavcodec     61. 19.101 / 61. 19.101
+  libavformat    61.  7.100 / 61.  7.100
+  libavdevice    61.  3.100 / 61.  3.100
+  libavfilter    10.  4.100 / 10.  4.100
+  libswscale      8.  3.100 /  8.  3.100
+  libswresample   5.  3.100 /  5.  3.100
+  libpostproc    58.  3.100 / 58.  3.100
+
+✅ Audio split into 1 chunks
+⚠️ Only 1 chunk(s) generated, falling back to single video
+INFO:     127.0.0.1:61306 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61434 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61471 - "GET /health HTTP/1.1" 200 OK
+🎬 Wav2Lip command: python inference.py --checkpoint_path checkpoints/wav2lip.pth --face /Users/shubhankarmittal/Desktop/Gen AI/Video Based Virtual Assistant/VBVA-1/avatars/general.jpg --audio /tmp/tts_enhanced_cache/1751241140137.mp3 --outfile /tmp/wav2lip_ultra_outputs/ultra_wav2lip_62eda241_cfc03ca9_339959.mp4 --static True --fps 10 --resize_factor 6 --pads 0 2 0 0 --wav2lip_batch_size 64 --nosmooth
+🎵 Audio duration: 16.03s, FPS: 10, Batch size: 64
+❌ Wav2Lip failed with return code 1
+❌ Wav2Lip stderr: Fatal Python error: init_sys_streams: can't initialize sys standard streams
+Python runtime state: core initialized
+OSError: [Errno 9] Bad file descriptor
+
+Current thread 0x00000001f1e84f40 (most recent call first):
+  <no Python frame>
+
+❌ Parallel processing failed: Wav2Lip processing failed: Fatal Python error: init_sys_streams: can't initialize sys standard streams
+Python runtime state: core initialized
+OSError: [Errno 9] Bad file descriptor
+
+Current thread 0x00000001f1e84f40 (most recent call first):
+  <no Python frame>
+
+🔄 Falling back to single video generation
+🎬 Wav2Lip command: python inference.py --checkpoint_path checkpoints/wav2lip.pth --face /Users/shubhankarmittal/Desktop/Gen AI/Video Based Virtual Assistant/VBVA-1/avatars/general.jpg --audio /tmp/tts_enhanced_cache/1751241140137.mp3 --outfile /tmp/wav2lip_ultra_outputs/ultra_wav2lip_62eda241_cfc03ca9_340142.mp4 --static True --fps 10 --resize_factor 6 --pads 0 2 0 0 --wav2lip_batch_size 64 --nosmooth
+🎵 Audio duration: 16.03s, FPS: 10, Batch size: 64
+❌ Wav2Lip failed with return code 1
+❌ Wav2Lip stderr: Fatal Python error: init_sys_streams: can't initialize sys standard streams
+Python runtime state: core initialized
+OSError: [Errno 9] Bad file descriptor
+
+Current thread 0x00000001f1e84f40 (most recent call first):
+  <no Python frame>
+
+Error in generate_video endpoint:
+Traceback (most recent call last):
+  File "/Users/shubhankarmittal/Desktop/Gen AI/Video Based Virtual Assistant/VBVA-1/services/ultra_fast_processor.py", line 215, in _generate_parallel_video_ultra_fast
+    return await self._generate_single_video_ultra_fast(audio_url, agent_type)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/shubhankarmittal/Desktop/Gen AI/Video Based Virtual Assistant/VBVA-1/services/ultra_fast_processor.py", line 181, in _generate_single_video_ultra_fast
+    output_path = await self._run_wav2lip_ultra_fast(audio_path, avatar_path)
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/shubhankarmittal/Desktop/Gen AI/Video Based Virtual Assistant/VBVA-1/services/ultra_fast_processor.py", line 505, in _run_wav2lip_ultra_fast
+    raise Exception(f"Wav2Lip processing failed: {stderr.decode()}")
+Exception: Wav2Lip processing failed: Fatal Python error: init_sys_streams: can't initialize sys standard streams
+Python runtime state: core initialized
+OSError: [Errno 9] Bad file descriptor
+
+Current thread 0x00000001f1e84f40 (most recent call first):
+  <no Python frame>
+
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Users/shubhankarmittal/Desktop/Gen AI/Video Based Virtual Assistant/VBVA-1/services/ultra_fast_processor.py", line 95, in process_video_ultra_fast
+    video_url = await self._generate_video_ultra_fast(audio_url, agent_type)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/shubhankarmittal/Desktop/Gen AI/Video Based Virtual Assistant/VBVA-1/services/ultra_fast_processor.py", line 166, in _generate_video_ultra_fast
+    video_url = await self._generate_parallel_video_ultra_fast(audio_url, agent_type)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/shubhankarmittal/Desktop/Gen AI/Video Based Virtual Assistant/VBVA-1/services/ultra_fast_processor.py", line 246, in _generate_parallel_video_ultra_fast
+    return await self._generate_single_video_ultra_fast(audio_url, agent_type)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/shubhankarmittal/Desktop/Gen AI/Video Based Virtual Assistant/VBVA-1/services/ultra_fast_processor.py", line 181, in _generate_single_video_ultra_fast
+    output_path = await self._run_wav2lip_ultra_fast(audio_path, avatar_path)
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/shubhankarmittal/Desktop/Gen AI/Video Based Virtual Assistant/VBVA-1/services/ultra_fast_processor.py", line 505, in _run_wav2lip_ultra_fast
+    raise Exception(f"Wav2Lip processing failed: {stderr.decode()}")
+Exception: Wav2Lip processing failed: Fatal Python error: init_sys_streams: can't initialize sys standard streams
+Python runtime state: core initialized
+OSError: [Errno 9] Bad file descriptor
+
+Current thread 0x00000001f1e84f40 (most recent call first):
+  <no Python frame>
+
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Users/shubhankarmittal/Desktop/Gen AI/Video Based Virtual Assistant/VBVA-1/api/routes.py", line 315, in generate_video_endpoint
+    video_url, stats = await ultra_processor.process_video_ultra_fast(
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/shubhankarmittal/Desktop/Gen AI/Video Based Virtual Assistant/VBVA-1/services/ultra_fast_processor.py", line 122, in process_video_ultra_fast
+    raise Exception(f"Ultra-fast processing failed after {total_time:.2f}s: {str(e)}")
+Exception: Ultra-fast processing failed after 200.06s: Wav2Lip processing failed: Fatal Python error: init_sys_streams: can't initialize sys standard streams
+Python runtime state: core initialized
+OSError: [Errno 9] Bad file descriptor
+
+Current thread 0x00000001f1e84f40 (most recent call first):
+  <no Python frame>
+
+
+INFO:     127.0.0.1:60697 - "POST /api/v1/generate_video HTTP/1.1" 500 Internal Server Error
+WARNING:  WatchFiles detected changes in 'frontend/app.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+Shutting down VBVA Backend...
+INFO:     Application shutdown complete.
+INFO:     Finished server process [98959]
+Fatal Python error: init_sys_streams: can't initialize sys standard streams
+Python runtime state: core initialized
+OSError: [Errno 9] Bad file descriptor
+
+Current thread 0x00000001f1e84f40 (most recent call first):
+  <no Python frame>
+WARNING:  WatchFiles detected changes in 'test_audio_video_sync_fix.py', 'api/routes.py'. Reloading...
+Fatal Python error: init_sys_streams: can't initialize sys standard streams
+Python runtime state: core initialized
+OSError: [Errno 9] Bad file descriptor
+
+Current thread 0x00000001f1e84f40 (most recent call first):
+  <no Python frame>
+INFO:     Stopping reloader process [98939]
